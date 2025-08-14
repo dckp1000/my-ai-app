@@ -8,16 +8,17 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        python-version: [3.9, 3.10, 3.11]
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.11"
+        python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: |
@@ -28,3 +29,25 @@ jobs:
       run: |
         pip install flake8
         flake8 .
+
+    - name: Code Formatting with Black
+      run: |
+        pip install black
+        black --check .
+
+    - name: Type Checking with MyPy
+      run: |
+        pip install mypy
+        mypy .
+
+    - name: Run Tests
+      run: |
+        pip install pytest
+        pytest
+
+    - name: Deployment Placeholder
+      run: echo "Deployment step will be added here for your chosen platform."
+
+    - name: Validate Deployment
+      run: |
+        curl -I https://your-deployment-url.com
