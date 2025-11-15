@@ -5,6 +5,9 @@ Simple copilot
 - AI chatbot using OpenAI GPT
 - NBA dataset downloader from Kaggle
 
+**📘 New to downloading from Kaggle? Check out the [Quick Start Guide](QUICKSTART.md)!**
+
+
 ## Installation
 
 1. Install dependencies:
