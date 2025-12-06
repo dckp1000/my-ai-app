@@ -18,9 +18,14 @@ pip install -r requirements.txt
 ## Usage
 
 ### Running the AI Chatbot
+
+Set your OpenAI API key as an environment variable (recommended for better security):
 ```bash
+export OPENAI_API_KEY="your-api-key-here"
 python app.py
 ```
+
+Alternatively, you can edit `app.py` and replace `YOUR_API_KEY` with your actual key.
 
 ### Downloading NBA Datasets from Kaggle
 
@@ -63,5 +68,13 @@ Downloaded datasets will be saved in the `./data` directory.
 
 ## Configuration
 
-- For the AI chatbot: Replace `YOUR_API_KEY` in `app.py` with your OpenAI API key
-- For Kaggle downloads: Set up `kaggle.json` as described above 
+- **For the AI chatbot**: 
+  - Recommended: Set the `OPENAI_API_KEY` environment variable with your OpenAI API key
+  - Alternative: Replace `YOUR_API_KEY` in `app.py` with your OpenAI API key
+- **For Kaggle downloads**: Set up `kaggle.json` as described above
+
+## Performance Improvements
+
+This application has been optimized for better performance:
+- **app.py**: OpenAI client is initialized once at module level, reducing overhead on each API call
+- **download_nba_dataset.py**: Uses efficient file system operations (`os.scandir`) to reduce system calls when listing downloaded files 
