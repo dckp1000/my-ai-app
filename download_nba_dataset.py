@@ -94,13 +94,17 @@ def download_nba_dataset(dataset_name=None):
         print("\n✓ Dataset downloaded successfully!")
         print(f"Location: {os.path.abspath(data_dir)}")
         
-        # List downloaded files
+        # List downloaded files using scandir for better performance
         print("\nDownloaded files:")
-        for file in os.listdir(data_dir):
-            file_path = os.path.join(data_dir, file)
-            if os.path.isfile(file_path):
-                size = os.path.getsize(file_path)
-                print(f"  - {file} ({size:,} bytes)")
+        try:
+            with os.scandir(data_dir) as entries:
+                for entry in entries:
+                    if entry.is_file():
+                        # Use stat() from DirEntry for better performance (single syscall)
+                        size = entry.stat().st_size
+                        print(f"  - {entry.name} ({size:,} bytes)")
+        except OSError as e:
+            print(f"  Warning: Could not list some files: {e}")
         
     except Exception as e:
         print(f"\n✗ Error downloading dataset: {str(e)}")
