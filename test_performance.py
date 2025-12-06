@@ -12,55 +12,55 @@ import shutil
 class TestAppPerformance(unittest.TestCase):
     """Test performance improvements in app.py"""
     
-    def test_client_initialized_once(self):
+    @mock.patch('openai.OpenAI')
+    def test_client_initialized_once(self, mock_openai):
         """Test that OpenAI client is initialized only once at module level"""
-        with mock.patch('openai.OpenAI') as mock_openai:
-            # Set up mock
-            mock_client = mock.MagicMock()
-            mock_openai.return_value = mock_client
-            mock_response = mock.MagicMock()
-            mock_response.choices = [mock.MagicMock()]
-            mock_response.choices[0].message.content = 'Test response'
-            mock_client.chat.completions.create.return_value = mock_response
-            
-            # Import module (this initializes the client)
-            import importlib
-            import app as app_module
-            importlib.reload(app_module)
-            
-            # Verify client was initialized once
-            initial_count = mock_openai.call_count
-            self.assertEqual(initial_count, 1, "Client should be initialized once at module level")
-            
-            # Call ask_gpt multiple times
-            app_module.ask_gpt("test 1")
-            app_module.ask_gpt("test 2")
-            app_module.ask_gpt("test 3")
-            
-            # Verify client was NOT re-initialized
-            self.assertEqual(mock_openai.call_count, initial_count, 
-                           "Client should not be re-initialized on subsequent calls")
+        # Set up mock
+        mock_client = mock.MagicMock()
+        mock_openai.return_value = mock_client
+        mock_response = mock.MagicMock()
+        mock_response.choices = [mock.MagicMock()]
+        mock_response.choices[0].message.content = 'Test response'
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        # Import module (this initializes the client)
+        import importlib
+        import app as app_module
+        importlib.reload(app_module)
+        
+        # Verify client was initialized once
+        initial_count = mock_openai.call_count
+        self.assertEqual(initial_count, 1, "Client should be initialized once at module level")
+        
+        # Call ask_gpt multiple times
+        app_module.ask_gpt("test 1")
+        app_module.ask_gpt("test 2")
+        app_module.ask_gpt("test 3")
+        
+        # Verify client was NOT re-initialized
+        self.assertEqual(mock_openai.call_count, initial_count, 
+                       "Client should not be re-initialized on subsequent calls")
     
-    def test_api_calls_use_same_client(self):
+    @mock.patch('openai.OpenAI')
+    def test_api_calls_use_same_client(self, mock_openai):
         """Test that all API calls use the same client instance"""
-        with mock.patch('openai.OpenAI') as mock_openai:
-            mock_client = mock.MagicMock()
-            mock_openai.return_value = mock_client
-            mock_response = mock.MagicMock()
-            mock_response.choices = [mock.MagicMock()]
-            mock_response.choices[0].message.content = 'Response'
-            mock_client.chat.completions.create.return_value = mock_response
-            
-            import importlib
-            import app as app_module
-            importlib.reload(app_module)
-            
-            # Make multiple calls
-            for i in range(5):
-                app_module.ask_gpt(f"prompt {i}")
-            
-            # Verify chat.completions.create was called 5 times on the same client
-            self.assertEqual(mock_client.chat.completions.create.call_count, 5)
+        mock_client = mock.MagicMock()
+        mock_openai.return_value = mock_client
+        mock_response = mock.MagicMock()
+        mock_response.choices = [mock.MagicMock()]
+        mock_response.choices[0].message.content = 'Response'
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        import importlib
+        import app as app_module
+        importlib.reload(app_module)
+        
+        # Make multiple calls
+        for i in range(5):
+            app_module.ask_gpt(f"prompt {i}")
+        
+        # Verify chat.completions.create was called 5 times on the same client
+        self.assertEqual(mock_client.chat.completions.create.call_count, 5)
 
 
 class TestDownloadScriptPerformance(unittest.TestCase):
@@ -156,7 +156,10 @@ class TestPerformanceComparison(unittest.TestCase):
             print(f"\nPerformance comparison:")
             print(f"  os.listdir approach: {time_old:.4f}s")
             print(f"  os.scandir approach: {time_new:.4f}s")
-            print(f"  Speedup: {time_old/time_new:.2f}x")
+            if time_new > 0:
+                print(f"  Speedup: {time_old/time_new:.2f}x")
+            else:
+                print(f"  Speedup: N/A (time_new too small to measure)")
             
         finally:
             shutil.rmtree(test_dir)
