@@ -84,8 +84,8 @@ def analyze_nba_games(spark, data_path="./data"):
             print(f"  Total columns: {len(df.columns)}")
             
             print(f"\nColumns:")
-            for col_name in df.columns:
-                print(f"  - {col_name}")
+            for column_name in df.columns:
+                print(f"  - {column_name}")
             
             # Show sample data
             print(f"\nSample Data (first 5 rows):")
