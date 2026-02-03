@@ -8,6 +8,8 @@ Simple copilot
 
 **📘 New to downloading from Kaggle? Check out the [Quick Start Guide](QUICKSTART.md)!**
 
+**⚡ Want to deploy with Spark? See the [Spark Deployment Guide](SPARK_DEPLOYMENT.md)!**
+
 
 ## Installation
 
