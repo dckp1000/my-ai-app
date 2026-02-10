@@ -4,8 +4,11 @@ Simple copilot
 ## Features
 - AI chatbot using OpenAI GPT
 - NBA dataset downloader from Kaggle
+- **Apache Spark integration for big data processing and analytics**
 
 **📘 New to downloading from Kaggle? Check out the [Quick Start Guide](QUICKSTART.md)!**
+
+**⚡ Want to deploy with Spark? See the [Spark Deployment Guide](SPARK_DEPLOYMENT.md)!**
 
 
 ## Installation
@@ -66,12 +69,106 @@ python download_nba_dataset.py username/dataset-name
 
 Downloaded datasets will be saved in the `./data` directory.
 
+### Running Spark Analytics on NBA Data
+
+**New!** Analyze NBA datasets at scale using Apache Spark.
+
+#### Option 1: Quick Deploy (Recommended)
+
+Use the deployment script for easy setup:
+
+```bash
+# Run in local mode (no cluster needed)
+./deploy_spark.sh local
+
+# Or submit to a Spark cluster
+./deploy_spark.sh cluster --master spark://master-node:7077
+```
+
+The deployment script will:
+- Check and install dependencies automatically
+- Verify NBA data is available
+- Run the Spark analysis application
+- Display comprehensive analytics on your NBA datasets
+
+#### Option 2: Manual Spark Execution
+
+Run the Spark application directly:
+
+```bash
+# Local mode with all available cores
+python spark_app.py
+
+# Or use spark-submit with custom configuration
+spark-submit \
+  --master local[4] \
+  --driver-memory 2g \
+  --executor-memory 2g \
+  --properties-file spark_config.conf \
+  spark_app.py
+```
+
+#### Option 3: Deploy to Spark Cluster
+
+For production deployments on a Spark cluster:
+
+```bash
+spark-submit \
+  --master spark://master:7077 \
+  --deploy-mode cluster \
+  --driver-memory 2g \
+  --executor-memory 2g \
+  --executor-cores 2 \
+  --properties-file spark_config.conf \
+  spark_app.py
+```
+
+**Supported Cluster Managers:**
+- Standalone Spark cluster
+- Apache YARN
+- Apache Mesos
+- Kubernetes
+
+#### What the Spark App Does
+
+The Spark application (`spark_app.py`) performs:
+- **Data Discovery**: Automatically finds and loads NBA CSV datasets
+- **Statistical Analysis**: Calculates averages, min/max values, and distributions
+- **Team Analytics**: Aggregates statistics by team
+- **Season Trends**: Analyzes data across different seasons
+- **Performance Optimization**: Uses Spark's adaptive query execution
+
+#### Spark Configuration
+
+Customize Spark settings by editing `spark_config.conf` or using environment variables:
+
+```bash
+# Set custom data path
+export NBA_DATA_PATH=/path/to/nba/data
+
+# Set Spark master URL
+export SPARK_MASTER=spark://master:7077
+
+# Run with custom settings
+./deploy_spark.sh cluster
+```
+
+Key configuration options in `spark_config.conf`:
+- Memory allocation (driver and executor)
+- Adaptive query execution settings
+- Shuffle and parallelism tuning
+- Serialization and compression options
+
 ## Configuration
 
 - **For the AI chatbot**: 
   - Recommended: Set the `OPENAI_API_KEY` environment variable with your OpenAI API key
   - Alternative: Replace `YOUR_API_KEY` in `app.py` with your OpenAI API key
 - **For Kaggle downloads**: Set up `kaggle.json` as described above
+- **For Spark analytics**:
+  - Set `NBA_DATA_PATH` environment variable to specify data location (default: `./data`)
+  - Set `SPARK_MASTER` environment variable for cluster deployments (default: `local[*]`)
+  - Customize settings in `spark_config.conf` for advanced tuning
 
 ## Performance Improvements
 
