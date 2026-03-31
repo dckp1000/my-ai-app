@@ -29,6 +29,8 @@
 pip install -r requirements.txt
 ```
 
+> `requirements.txt` is a pinned lock file generated from `requirements.in` using [pip-tools](https://pip-tools.readthedocs.io/). Install from `requirements.txt` for reproducible installs. To update deps, see the README.
+
 ## Step 3: Download NBA Dataset
 
 **Interactive mode (recommended for first-time users):**
