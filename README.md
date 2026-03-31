@@ -15,6 +15,21 @@ Simple copilot
 pip install -r requirements.txt
 ```
 
+> **Note:** `requirements.txt` is a generated pinned lock file. Do not edit it directly — edit `requirements.in` instead (see [Updating Dependencies](#updating-dependencies) below).
+
+## Updating Dependencies
+
+`requirements.in` is the source of truth for top-level dependencies. `requirements.txt` is auto-generated from it using [pip-tools](https://pip-tools.readthedocs.io/).
+
+To update dependencies after editing `requirements.in`:
+
+```bash
+pip install pip-tools
+pip-compile requirements.in -o requirements.txt --no-emit-index-url --strip-extras
+```
+
+Commit both `requirements.in` and the updated `requirements.txt`.
+
 ## Usage
 
 ### Running the AI Chatbot
