@@ -57,7 +57,7 @@ check_dependencies() {
     if ! python3 -c "import pyspark" 2>/dev/null; then
         print_error "PySpark is not installed!"
         print_info "Installing dependencies from requirements.txt..."
-        pip install -r requirements.txt
+        python3 -m pip install -r requirements.txt
     else
         print_info "PySpark is installed ✓"
     fi
@@ -65,7 +65,8 @@ check_dependencies() {
 
 # Check if data directory exists
 check_data() {
-    if [ ! -d "./data" ]; then
+    DATA_DIR="${NBA_DATA_PATH:-./data}"
+    if [ ! -d "$DATA_DIR" ]; then
         print_warning "Data directory not found!"
         print_info "You may want to download NBA datasets first:"
         print_info "  python download_nba_dataset.py"
@@ -77,7 +78,7 @@ check_data() {
         fi
     else
         print_info "Data directory found ✓"
-        csv_count=$(find ./data -name "*.csv" | wc -l)
+        csv_count=$(find "$DATA_DIR" -name "*.csv" 2>/dev/null | wc -l)
         print_info "Found $csv_count CSV file(s)"
     fi
 }
@@ -96,13 +97,41 @@ run_cluster() {
     # Parse additional arguments
     shift  # Remove first argument (mode)
     
-    # Override master if provided
-    if [[ "$@" == *"--master"* ]]; then
-        for i in "$@"; do
-            if [[ $i == spark://* ]] || [[ $i == yarn* ]] || [[ $i == mesos://* ]]; then
-                SPARK_MASTER=$i
-            fi
-        done
+    # Parse master URL from arguments
+    master_value=""
+    expect_master_value=0
+    remaining_args=()
+    
+    for arg in "$@"; do
+        if [[ $expect_master_value -eq 1 ]]; then
+            master_value="$arg"
+            expect_master_value=0
+            continue
+        fi
+        
+        case "$arg" in
+            --master=*)
+                master_value="${arg#--master=}"
+                ;;
+            --master)
+                expect_master_value=1
+                ;;
+            spark://* | yarn* | mesos://* | k8s://*)
+                # Allow direct master URL without --master prefix
+                master_value="$arg"
+                ;;
+            *)
+                # Collect other arguments to pass through to spark-submit
+                remaining_args+=("$arg")
+                ;;
+        esac
+    done
+    
+    # Set SPARK_MASTER if a valid master URL was found
+    if [[ -n "$master_value" ]]; then
+        if [[ $master_value == spark://* ]] || [[ $master_value == yarn* ]] || [[ $master_value == mesos://* ]] || [[ $master_value == k8s://* ]]; then
+            SPARK_MASTER="$master_value"
+        fi
     fi
     
     print_info "Spark Master: $SPARK_MASTER"
@@ -118,16 +147,30 @@ run_cluster() {
         exit 1
     fi
     
+    # Build spark-submit command with additional arguments
+    submit_args=(
+        --master "$SPARK_MASTER"
+        --name "$APP_NAME"
+        --driver-memory "$DRIVER_MEMORY"
+        --executor-memory "$EXECUTOR_MEMORY"
+        --executor-cores "$EXECUTOR_CORES"
+        --conf spark.sql.adaptive.enabled=true
+        --conf spark.sql.adaptive.coalescePartitions.enabled=true
+    )
+    
+    # Pass NBA_DATA_PATH to executors if set
+    if [[ -n "${NBA_DATA_PATH}" ]]; then
+        submit_args+=(--conf "spark.executorEnv.NBA_DATA_PATH=${NBA_DATA_PATH}")
+    fi
+    
+    # Add remaining arguments
+    submit_args+=("${remaining_args[@]}")
+    
+    # Add the application file
+    submit_args+=(spark_app.py)
+    
     # Submit the job
-    spark-submit \
-        --master "$SPARK_MASTER" \
-        --name "$APP_NAME" \
-        --driver-memory "$DRIVER_MEMORY" \
-        --executor-memory "$EXECUTOR_MEMORY" \
-        --executor-cores "$EXECUTOR_CORES" \
-        --conf spark.sql.adaptive.enabled=true \
-        --conf spark.sql.adaptive.coalescePartitions.enabled=true \
-        spark_app.py
+    spark-submit "${submit_args[@]}"
 }
 
 # Show usage

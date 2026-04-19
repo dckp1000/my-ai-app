@@ -13,7 +13,6 @@ Usage:
 """
 
 import os
-import sys
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, count, avg, max as spark_max, min as spark_min
 
@@ -28,11 +27,12 @@ def create_spark_session(app_name="NBA Data Analysis"):
     Returns:
         SparkSession instance
     """
-    spark = SparkSession.builder \
-        .appName(app_name) \
-        .config("spark.sql.adaptive.enabled", "true") \
-        .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+    spark = (
+        SparkSession.builder.appName(app_name)
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
         .getOrCreate()
+    )
     
     return spark
 
@@ -78,6 +78,9 @@ def analyze_nba_games(spark, data_path="./data"):
             # Read CSV file
             df = spark.read.csv(file_path, header=True, inferSchema=True)
             
+            # Cache the DataFrame to avoid expensive multiple scans
+            df.cache()
+            
             # Basic statistics
             print(f"\nDataset Info:")
             print(f"  Total rows: {df.count():,}")
@@ -94,6 +97,9 @@ def analyze_nba_games(spark, data_path="./data"):
             # Perform analysis based on available columns
             analyze_dataset_columns(df, csv_file)
             
+            # Unpersist the DataFrame after use
+            df.unpersist()
+            
         except Exception as e:
             print(f"Error processing {csv_file}: {str(e)}")
 
@@ -106,12 +112,15 @@ def analyze_dataset_columns(df, filename):
         df: Spark DataFrame
         filename: Name of the file being analyzed
     """
-    columns = [col.lower() for col in df.columns]
+    # Create case-insensitive column mapping
+    column_map = {col_name.lower(): col_name for col_name in df.columns}
+    columns_lower = list(column_map.keys())
     
     # Analyze games data
-    if 'pts' in columns or 'points' in columns:
+    if 'pts' in columns_lower or 'points' in columns_lower:
         print("\n--- Points Analysis ---")
-        pts_col = 'pts' if 'pts' in columns else 'points'
+        pts_col_lower = 'pts' if 'pts' in columns_lower else 'points'
+        pts_col = column_map[pts_col_lower]
         
         stats = df.select(
             avg(col(pts_col)).alias('avg_points'),
@@ -119,31 +128,41 @@ def analyze_dataset_columns(df, filename):
             spark_min(col(pts_col)).alias('min_points')
         ).collect()[0]
         
-        print(f"Average Points: {stats['avg_points']:.2f}")
-        print(f"Maximum Points: {stats['max_points']}")
-        print(f"Minimum Points: {stats['min_points']}")
+        # Handle None values for empty DataFrames
+        if stats['avg_points'] is not None:
+            print(f"Average Points: {stats['avg_points']:.2f}")
+            print(f"Maximum Points: {stats['max_points']}")
+            print(f"Minimum Points: {stats['min_points']}")
+        else:
+            print("No data available for points analysis")
     
     # Analyze by team
-    if 'team' in columns or 'team_abbreviation' in columns:
-        team_col = 'team' if 'team' in columns else 'team_abbreviation'
+    if 'team' in columns_lower or 'team_abbreviation' in columns_lower:
+        team_col_lower = 'team' if 'team' in columns_lower else 'team_abbreviation'
+        team_col = column_map[team_col_lower]
         print(f"\n--- Team Statistics ---")
         
-        team_stats = df.groupBy(team_col) \
-            .agg(count("*").alias("games")) \
-            .orderBy(col("games").desc()) \
+        team_stats = (
+            df.groupBy(team_col)
+            .agg(count("*").alias("games"))
+            .orderBy(col("games").desc())
             .limit(10)
+        )
         
         print("Top 10 teams by number of records:")
         team_stats.show(truncate=False)
     
     # Analyze by season
-    if 'season' in columns or 'season_id' in columns:
-        season_col = 'season' if 'season' in columns else 'season_id'
+    if 'season' in columns_lower or 'season_id' in columns_lower:
+        season_col_lower = 'season' if 'season' in columns_lower else 'season_id'
+        season_col = column_map[season_col_lower]
         print(f"\n--- Season Statistics ---")
         
-        season_stats = df.groupBy(season_col) \
-            .agg(count("*").alias("records")) \
+        season_stats = (
+            df.groupBy(season_col)
+            .agg(count("*").alias("records"))
             .orderBy(season_col)
+        )
         
         print("Records by season:")
         season_stats.show(truncate=False)
