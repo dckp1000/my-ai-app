@@ -1,134 +1,134 @@
 """
 Tests for performance improvements in the AI app.
+
+Goals:
+- Verify the OpenAI client is initialized once at module import time and reused by ask_gpt.
+- Prefer deterministic behavioral tests over wall-clock timing benchmarks.
+- Keep filesystem tests reliable across OS/CI environments.
 """
-import unittest
-from unittest import mock
+
+from __future__ import annotations
+
+import importlib
 import os
 import sys
 import tempfile
-import shutil
+import time
+import unittest
+from unittest import mock
+
+
+def _fresh_import(module_name: str):
+    """Import a module from scratch (bypassing any cached sys.modules entry)."""
+    if module_name in sys.modules:
+        del sys.modules[module_name]
+    return importlib.import_module(module_name)
 
 
 class TestAppPerformance(unittest.TestCase):
-    """Test performance improvements in app.py"""
-    
-    @mock.patch('openai.OpenAI')
-    def test_client_initialized_once(self, mock_openai):
-        """Test that OpenAI client is initialized only once at module level"""
-        # Set up mock
-        mock_client = mock.MagicMock()
-        mock_openai.return_value = mock_client
+    """Tests performance-related behavior in app.py"""
+
+    def _make_mock_response(self, content: str = "Test response"):
         mock_response = mock.MagicMock()
         mock_response.choices = [mock.MagicMock()]
-        mock_response.choices[0].message.content = 'Test response'
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        # Import module (this initializes the client)
-        import importlib
-        import app as app_module
-        importlib.reload(app_module)
-        
-        # Verify client was initialized once
-        initial_count = mock_openai.call_count
-        self.assertEqual(initial_count, 1, "Client should be initialized once at module level")
-        
-        # Call ask_gpt multiple times
+        mock_response.choices[0].message.content = content
+        return mock_response
+
+    @mock.patch("app.OpenAI")
+    def test_client_initialized_once_at_import_and_reused(self, mock_openai):
+        """OpenAI client should be constructed once at module import and reused."""
+        mock_client = mock.MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.chat.completions.create.return_value = self._make_mock_response()
+
+        # Fresh import so module-level client initialization happens under our patch.
+        app_module = _fresh_import("app")
+
+        # Client constructed once at import time
+        mock_openai.assert_called_once()
+
+        # Multiple calls should not reconstruct the client
         app_module.ask_gpt("test 1")
         app_module.ask_gpt("test 2")
         app_module.ask_gpt("test 3")
-        
-        # Verify client was NOT re-initialized
-        self.assertEqual(mock_openai.call_count, initial_count, 
-                       "Client should not be re-initialized on subsequent calls")
-    
-    @mock.patch('openai.OpenAI')
-    def test_api_calls_use_same_client(self, mock_openai):
-        """Test that all API calls use the same client instance"""
+        mock_openai.assert_called_once()
+
+        # But API calls should be routed through the one shared client
+        self.assertEqual(mock_client.chat.completions.create.call_count, 3)
+
+    @mock.patch("app.OpenAI")
+    def test_api_calls_use_same_client_instance(self, mock_openai):
+        """All ask_gpt calls should use the same mock client instance."""
         mock_client = mock.MagicMock()
         mock_openai.return_value = mock_client
-        mock_response = mock.MagicMock()
-        mock_response.choices = [mock.MagicMock()]
-        mock_response.choices[0].message.content = 'Response'
-        mock_client.chat.completions.create.return_value = mock_response
-        
-        import importlib
-        import app as app_module
-        importlib.reload(app_module)
-        
-        # Make multiple calls
+        mock_client.chat.completions.create.return_value = self._make_mock_response("Response")
+
+        app_module = _fresh_import("app")
+
         for i in range(5):
             app_module.ask_gpt(f"prompt {i}")
-        
-        # Verify chat.completions.create was called 5 times on the same client
+
         self.assertEqual(mock_client.chat.completions.create.call_count, 5)
+
+        # Optional: verify the prompts were passed through
+        calls = mock_client.chat.completions.create.call_args_list
+        for i, call in enumerate(calls):
+            kwargs = call.kwargs
+            self.assertEqual(kwargs["model"], "gpt-3.5-turbo")
+            self.assertEqual(kwargs["messages"], [{"role": "user", "content": f"prompt {i}"}])
 
 
 class TestDownloadScriptPerformance(unittest.TestCase):
-    """Test performance improvements in download_nba_dataset.py"""
-    
-    def test_scandir_efficiency(self):
-        """Test that file listing uses os.scandir for better performance"""
-        # Create a temporary directory with test files
-        test_dir = tempfile.mkdtemp()
-        try:
-            # Create test files
+    """Filesystem behavior tests (scandir usage pattern)."""
+
+    def test_scandir_lists_files_and_sizes(self):
+        """Validate scandir-based listing returns correct file sizes."""
+        with tempfile.TemporaryDirectory() as test_dir:
             for i in range(10):
-                filepath = os.path.join(test_dir, f'test_file_{i}.csv')
-                with open(filepath, 'w') as f:
-                    f.write('x' * (100 * (i + 1)))
-            
-            # Test the scandir approach (simulating the code in download_nba_dataset.py)
+                filepath = os.path.join(test_dir, f"test_file_{i}.csv")
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("x" * (100 * (i + 1)))
+
             files_found = []
             with os.scandir(test_dir) as entries:
                 for entry in entries:
                     if entry.is_file():
                         size = entry.stat().st_size
                         files_found.append((entry.name, size))
-            
-            # Verify all files were found
+
             self.assertEqual(len(files_found), 10)
-            
-            # Verify sizes are correct
+
             for name, size in files_found:
-                if name.startswith('test_file_'):
-                    idx = int(name.split('_')[2].split('.')[0])
-                    expected_size = 100 * (idx + 1)
-                    self.assertEqual(size, expected_size)
-        
-        finally:
-            shutil.rmtree(test_dir)
-    
-    def test_scandir_error_handling(self):
-        """Test that scandir properly handles errors"""
-        # Test with non-existent directory
-        non_existent = '/nonexistent/directory/path'
-        
-        try:
-            with os.scandir(non_existent) as entries:
+                idx = int(name.split("_")[2].split(".")[0])
+                expected_size = 100 * (idx + 1)
+                self.assertEqual(size, expected_size)
+
+    def test_scandir_error_handling_missing_dir(self):
+        """scandir should raise when directory does not exist (portable path)."""
+        # Create then remove a directory to guarantee a non-existent path on all OSes
+        with tempfile.TemporaryDirectory() as d:
+            missing = os.path.join(d, "definitely_missing")
+
+        with self.assertRaises(OSError):
+            with os.scandir(missing) as entries:
                 list(entries)
-            self.fail("Should have raised OSError")
-        except OSError:
-            # Expected behavior
-            pass
 
 
 class TestPerformanceComparison(unittest.TestCase):
-    """Compare performance of old vs new approaches"""
-    
-    def test_file_listing_performance(self):
-        """Compare performance of os.listdir vs os.scandir"""
-        import time
-        
-        # Create a temporary directory with many files
-        test_dir = tempfile.mkdtemp()
-        try:
-            # Create 100 test files
-            for i in range(100):
-                filepath = os.path.join(test_dir, f'file_{i}.txt')
-                with open(filepath, 'w') as f:
-                    f.write('data')
-            
-            # Old approach (os.listdir)
+    """Lightweight comparison test (kept non-failing; prints only)."""
+
+    @unittest.skipUnless(
+        os.environ.get("RUN_BENCHMARKS") == "1",
+        "Set RUN_BENCHMARKS=1 to run timing benchmarks (skipped in CI by default).",
+    )
+    def test_file_listing_performance_benchmark(self):
+        """Optional benchmark comparing os.listdir vs os.scandir (non-deterministic)."""
+        with tempfile.TemporaryDirectory() as test_dir:
+            for i in range(2000):
+                filepath = os.path.join(test_dir, f"file_{i}.txt")
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write("data")
+
             start_old = time.perf_counter()
             files_old = []
             for file in os.listdir(test_dir):
@@ -137,8 +137,7 @@ class TestPerformanceComparison(unittest.TestCase):
                     size = os.path.getsize(file_path)
                     files_old.append((file, size))
             time_old = time.perf_counter() - start_old
-            
-            # New approach (os.scandir)
+
             start_new = time.perf_counter()
             files_new = []
             with os.scandir(test_dir) as entries:
@@ -147,23 +146,17 @@ class TestPerformanceComparison(unittest.TestCase):
                         size = entry.stat().st_size
                         files_new.append((entry.name, size))
             time_new = time.perf_counter() - start_new
-            
-            # Verify both approaches return the same results
+
             self.assertEqual(len(files_old), len(files_new))
-            
-            # New approach should be at least as fast or faster
-            # (In practice, scandir is faster, but we just verify it works)
-            print(f"\nPerformance comparison:")
-            print(f"  os.listdir approach: {time_old:.4f}s")
-            print(f"  os.scandir approach: {time_new:.4f}s")
+
+            print("\nPerformance comparison:")
+            print(f"  os.listdir approach: {time_old:.6f}s")
+            print(f"  os.scandir approach: {time_new:.6f}s")
             if time_new > 0:
-                print(f"  Speedup: {time_old/time_new:.2f}x")
+                print(f"  Speedup: {time_old / time_new:.2f}x")
             else:
-                print(f"  Speedup: N/A (time_new too small to measure)")
-            
-        finally:
-            shutil.rmtree(test_dir)
+                print("  Speedup: N/A (time_new too small)")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
