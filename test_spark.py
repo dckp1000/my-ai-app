@@ -232,6 +232,29 @@ class TestSparkAnalytics(unittest.TestCase):
             except Exception as e:
                 self.fail(f"DataFrame caching test failed: {e}")
 
+    def test_run_custom_query_missing_directory(self):
+        """Test that run_custom_query handles missing data directory gracefully"""
+        from spark_app import run_custom_query
+
+        # Should not raise an exception with non-existent directory
+        try:
+            run_custom_query(self.spark, "SELECT * FROM nba_data", "/nonexistent/path")
+        except FileNotFoundError:
+            self.fail("run_custom_query raised FileNotFoundError for missing directory")
+        except Exception as e:
+            self.fail(f"run_custom_query raised unexpected exception: {e}")
+
+    def test_run_custom_query_empty_directory(self):
+        """Test that run_custom_query handles empty data directory"""
+        from spark_app import run_custom_query
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Should handle empty directory without exception
+            try:
+                run_custom_query(self.spark, "SELECT * FROM nba_data", tmpdir)
+            except Exception as e:
+                self.fail(f"run_custom_query failed with empty directory: {e}")
+
     def test_create_spark_session(self):
         """Test that Spark session is created with correct configuration"""
         from spark_app import create_spark_session

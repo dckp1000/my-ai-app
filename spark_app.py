@@ -177,6 +177,12 @@ def run_custom_query(spark, query, data_path="./data"):
         query: SQL query string
         data_path: Path to the data directory
     """
+    # Check if data directory exists
+    if not os.path.exists(data_path):
+        print(f"Error: Data directory '{data_path}' not found.")
+        print("Please run 'python download_nba_dataset.py' first to download NBA data.")
+        return
+    
     csv_files = [f for f in os.listdir(data_path) if f.endswith('.csv')]
     
     if not csv_files:

@@ -11,9 +11,13 @@
 #   local   - Run Spark in local mode (default)
 #   cluster - Submit job to a Spark cluster
 #
+# Options:
+#   --yes   - Non-interactive mode, skip prompts
+#
 # Examples:
 #   ./deploy_spark.sh local
 #   ./deploy_spark.sh cluster --master spark://master-node:7077
+#   ./deploy_spark.sh local --yes
 #
 
 set -e  # Exit on error
@@ -25,6 +29,14 @@ APP_NAME="NBA-Data-Analysis"
 DRIVER_MEMORY="2g"
 EXECUTOR_MEMORY="2g"
 EXECUTOR_CORES="2"
+NON_INTERACTIVE=false
+
+# Parse for --yes flag
+for arg in "$@"; do
+    if [[ "$arg" == "--yes" ]] || [[ "$arg" == "-y" ]]; then
+        NON_INTERACTIVE=true
+    fi
+done
 
 # Colors for output
 RED='\033[0;31m'
@@ -71,6 +83,13 @@ check_data() {
         print_info "You may want to download NBA datasets first:"
         print_info "  python download_nba_dataset.py"
         echo ""
+        
+        # Check if running in non-interactive mode or non-tty
+        if [[ "$NON_INTERACTIVE" == "true" ]] || ! [[ -t 0 ]]; then
+            print_error "Cannot prompt in non-interactive mode. Use 'python download_nba_dataset.py' to download data first."
+            exit 1
+        fi
+        
         read -p "Continue anyway? (y/n) " -n 1 -r
         echo ""
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -181,12 +200,16 @@ show_usage() {
     echo "  local   - Run Spark in local mode (default)"
     echo "  cluster - Submit job to a Spark cluster"
     echo ""
+    echo "Options:"
+    echo "  --yes, -y          - Non-interactive mode, skip prompts"
+    echo ""
     echo "Environment Variables:"
     echo "  SPARK_MASTER       - Spark master URL (default: local[*])"
     echo "  NBA_DATA_PATH      - Path to NBA data (default: ./data)"
     echo ""
     echo "Examples:"
     echo "  $0 local"
+    echo "  $0 local --yes"
     echo "  $0 cluster --master spark://master-node:7077"
     echo "  SPARK_MASTER=yarn $0 cluster"
     exit 1
