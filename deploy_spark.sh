@@ -24,6 +24,8 @@ set -e  # Exit on error
 
 # Default configuration
 MODE="${1:-local}"
+# Track whether SPARK_MASTER was explicitly set by the user
+SPARK_MASTER_EXPLICIT="${SPARK_MASTER:-}"
 SPARK_MASTER="${SPARK_MASTER:-local[*]}"
 APP_NAME="NBA-Data-Analysis"
 DRIVER_MEMORY="2g"
@@ -154,6 +156,13 @@ run_cluster() {
         if [[ $master_value == spark://* ]] || [[ $master_value == yarn* ]] || [[ $master_value == mesos://* ]] || [[ $master_value == k8s://* ]]; then
             SPARK_MASTER="$master_value"
         fi
+    fi
+
+    # Require an explicit master URL for cluster mode
+    if [[ -z "$master_value" ]] && [[ -z "$SPARK_MASTER_EXPLICIT" ]]; then
+        print_error "Cluster mode requires an explicit master URL."
+        print_info "Provide --master <url> or set the SPARK_MASTER environment variable."
+        exit 1
     fi
     
     print_info "Spark Master: $SPARK_MASTER"

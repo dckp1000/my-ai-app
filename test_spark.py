@@ -1,6 +1,7 @@
 """
 Tests for Spark application functionality.
 """
+
 import unittest
 import tempfile
 import os
@@ -173,7 +174,8 @@ class TestSparkAnalytics(unittest.TestCase):
             self.fail(f"Season aggregation failed: {e}")
 
     def test_analyze_dataset_columns_with_alternative_column_names(self):
-        """Test that alternative column names (points, team_abbreviation, season_id) work"""
+        """Test that alternative column names (points, team_abbreviation,
+        season_id) work."""
         from spark_app import analyze_dataset_columns
 
         schema = StructType(
@@ -264,9 +266,7 @@ class TestSparkAnalytics(unittest.TestCase):
         self.assertIsNotNone(spark)
 
         # Verify adaptive execution is enabled
-        self.assertEqual(
-            spark.conf.get("spark.sql.adaptive.enabled"), "true"
-        )
+        self.assertEqual(spark.conf.get("spark.sql.adaptive.enabled"), "true")
         self.assertEqual(
             spark.conf.get("spark.sql.adaptive.coalescePartitions.enabled"),
             "true",
