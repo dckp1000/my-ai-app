@@ -2,7 +2,6 @@
 Tests for Spark application functionality.
 """
 import unittest
-from unittest import mock
 import tempfile
 import os
 from pyspark.sql import SparkSession
@@ -272,8 +271,7 @@ class TestSparkAnalytics(unittest.TestCase):
             spark.conf.get("spark.sql.adaptive.coalescePartitions.enabled"),
             "true",
         )
-
-        spark.stop()
+        # Do not stop the session here — tearDownClass manages the shared session
 
 
 if __name__ == "__main__":

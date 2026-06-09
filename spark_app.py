@@ -81,24 +81,25 @@ def analyze_nba_games(spark, data_path="./data"):
             # Cache the DataFrame to avoid expensive multiple scans
             df.cache()
             
-            # Basic statistics
-            print(f"\nDataset Info:")
-            print(f"  Total rows: {df.count():,}")
-            print(f"  Total columns: {len(df.columns)}")
-            
-            print(f"\nColumns:")
-            for column_name in df.columns:
-                print(f"  - {column_name}")
-            
-            # Show sample data
-            print(f"\nSample Data (first 5 rows):")
-            df.show(5, truncate=False)
-            
-            # Perform analysis based on available columns
-            analyze_dataset_columns(df, csv_file)
-            
-            # Unpersist the DataFrame after use
-            df.unpersist()
+            try:
+                # Basic statistics
+                print(f"\nDataset Info:")
+                print(f"  Total rows: {df.count():,}")
+                print(f"  Total columns: {len(df.columns)}")
+                
+                print(f"\nColumns:")
+                for column_name in df.columns:
+                    print(f"  - {column_name}")
+                
+                # Show sample data
+                print(f"\nSample Data (first 5 rows):")
+                df.show(5, truncate=False)
+                
+                # Perform analysis based on available columns
+                analyze_dataset_columns(df, csv_file)
+            finally:
+                # Unpersist the DataFrame after use, even if an error occurs
+                df.unpersist()
             
         except Exception as e:
             print(f"Error processing {csv_file}: {str(e)}")

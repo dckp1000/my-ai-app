@@ -139,6 +139,9 @@ run_cluster() {
                 # Allow direct master URL without --master prefix
                 master_value="$arg"
                 ;;
+            --yes | -y)
+                # Non-interactive flag — already handled globally, skip forwarding to spark-submit
+                ;;
             *)
                 # Collect other arguments to pass through to spark-submit
                 remaining_args+=("$arg")
